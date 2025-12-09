@@ -62,6 +62,40 @@ Over the past three months, we continued to explore the potential of the Qwen3 f
     </p>
 </details>
 
+## 本仓库的补充说明（Local changes & Terminal streaming Markdown）
+
+本仓库包含一些本地调试与体验的扩展：
+
+- 本地模型：仓库提供或可加载 `models/Qwen3-0.6B/`（包含 tokenizer、模型权重等），可直接在本地进行快速测试和推理。
+- 交互脚本：新增 `Qwen3_0_6B_Chat.py`，提供基于 Transformers 的终端聊天体验，支持即时流式输出与完整会话历史管理。
+- 流式 Markdown 渲染：新增 `streaming_markdown.py` 模块，实现了增量的 Markdown 渲染功能（基于 `rich`），特性包括：
+    - 增量/流式渲染（Rich 的 `Live` 界面）与回退机制（若未安装 `rich` 则使用普通 `TextStreamer`）。
+    - 支持跳过 prompt（prefill）tokens，防止重复打印对话历史。
+    - 流式渲染时对部分 Markdown 做了基础 normalize（dedent）；在最终输出时会把缩进代码块转换为围栏代码块（```），并修正表格缩进以提升终端渲染质量。
+    - 支持渲染频率与防抖配置（`STREAMING_RENDER_EVERY`、`STREAMING_MIN_INTERVAL_MS`）；可通过环境变量或命令行参数调整（见下）。
+    - `create_streamer()` 工厂函数用于简单创建带预填长度（prefill_len）处理的 `RichMarkdownStreamer`。
+- 自动上下文管理：在 `Qwen3_0_6B_Chat.py` 中实现了基于 tokenizer 的 `ensure_within_context()` 截断逻辑（会在需要时删除最早消息），以保证 `input_ids` + `max_new_tokens` 不超过模型上下文长度（默认使用 `tokenizer.model_max_length` 或 32768）。
+
+快速运行示例（建议先安装 rich）：
+```bash
+pip install rich
+python Qwen3_0_6B_Chat.py --render-every 2 --min-interval-ms 100 --max-new-tokens 1024 --label "Qwen3-0.6B："
+```
+
+常用 CLI 参数（`python Qwen3_0_6B_Chat.py --help` 可见）：
+- `--no-markdown`：禁用增量 Markdown 渲染（仅使用纯文本流）。
+- `--render-every N`：每多少 token 更新一次流式渲染（越小越频繁）。
+- `--min-interval-ms M`：两次渲染之间的最小时间间隔，单位毫秒（防抖）。
+- `--max-new-tokens K`：单次生成的最大 token 数（传给 `model.generate(max_new_tokens=...)`）。
+- `--context-length L`：手动指定模型上下文长度（若未指定，默认来自 tokenizer 或 32768）。
+- `--label '...'`：自定义聊天中显示的模型标签。
+
+注意事项：
+- 终端对 `rich` 的表现差异较大：建议在 Windows Terminal、iTerm2 或 WSL 中使用以获得更好的颜色与格式支持；老旧终端或某些环境下可能出现闪烁或显示问题。
+- 若开启高频率的渲染（例如 `--render-every 1`、`--min-interval-ms 50`），会带来更频繁的屏幕重绘，从而可能增加 CPU 占用并在低性能环境中导致卡顿或错位。
+- 截断策略目前简单地移除最早消息对以保证上下文长度，你可以在需要时对截断策略进行改进（例如仅移除 user/assistant pairs 而保留 system 消息或实现摘要压缩）。
+
+
 
 ## News
 - 2025.08.08: You can now use Qwen3-2507 to handle ultra-long inputs of **1 million tokens**! See the update modelcards ([235B-A22B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-235B-A22B-Instruct-2507), [235B-A22B-Thinking-2507](https://huggingface.co/Qwen/Qwen3-235B-A22B-Thinking-2507), [A30B-A3B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-30B-A3B-Instruct-2507), [A30B-A3B-Thinking-2507](https://huggingface.co/Qwen/Qwen3-30B-A3B-Thinking-2507)) for how to enable this feature.
